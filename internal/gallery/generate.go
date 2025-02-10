@@ -139,7 +139,7 @@ func Generate(inputDir, outputDir, templateDir string, photosPerPage int, prevLa
             if err := copyPhoto(srcPath, dstPath); err != nil {
                 LogWarn("Failed to copy photo %s to %s: %v", srcPath, dstPath, err)
             }
-            photos[start+i].Path = filepath.Join(fmt.Sprintf("photos_page_%d", pageNum), filepath.Base(photo.Path))
+            photos[start+i].Path = filepath.ToSlash(filepath.Join(fmt.Sprintf("photos_page_%d", pageNum), filepath.Base(photo.Path)))
         }
 
         pageData := PageData{
