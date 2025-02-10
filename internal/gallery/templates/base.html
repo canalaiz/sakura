@@ -1,0 +1,56 @@
+{{ define "base" }}
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ .Title }}</title>
+    <style>
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            padding: 10px;
+            margin: 0 auto;
+        }
+        .card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #f9f9f9;
+            text-align: center;
+        }
+        .card-image {
+            width: 100%;
+            height: auto;
+            object-fit: cover;
+        }
+        .card-title {
+            margin: 16px 0;
+        }
+        .pagination {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .pagination a {
+            margin: 0 5px;
+            text-decoration: none;
+            color: blue;
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-container">
+        {{ template "content" .Photos }}
+    </div>
+    <div class="pagination">
+        {{if .Prev}}
+        <a href="{{.Prev}}">{{ .PrevLabel }}</a>
+        {{end}}
+        {{if .Next}}
+        <a href="{{.Next}}">{{ .NextLabel }}</a>
+        {{end}}
+    </div>
+</body>
+</html>
+{{ end }}
