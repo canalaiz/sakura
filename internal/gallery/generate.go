@@ -51,13 +51,13 @@ func readPhotos(inputDir string) ([]Photo, error) {
             content, err := os.ReadFile(filePath)
             if err != nil {
                 LogWarn("Failed to read file %s: %v", filePath, err)
-                return nil, err
+                continue
             }
 
             var mediaContainers []MediaContainer
             if err := json.Unmarshal(content, &mediaContainers); err != nil {
                 LogWarn("Failed to unmarshal JSON from file %s: %v", filePath, err)
-                return nil, err
+                continue
             }
 
             for _, mediaContainer := range mediaContainers {
