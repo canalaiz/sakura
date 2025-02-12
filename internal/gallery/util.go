@@ -1,10 +1,56 @@
 package gallery
 
 import (
+    "encoding/json"
+    "fmt"
     "log"
     "os"
     "path/filepath"
 )
+
+func autoSenseJSON(content []byte) (string, error) {
+    var posts []MediaContainer
+    if err := json.Unmarshal(content, &posts); err == nil {
+        return "posts", nil
+    }
+
+    var archived struct {
+        Media []MediaContainer `json:"ig_archived_post_media"`
+    }
+    if err := json.Unmarshal(content, &archived); err == nil {
+        return "archived", nil
+    }
+
+    var reels struct {
+        Media []MediaContainer `json:"ig_reels_media"`
+    }
+    if err := json.Unmarshal(content, &reels); err == nil {
+        return "reels", nil
+    }
+
+    var stories struct {
+        Media []Media `json:"ig_stories"`
+    }
+    if err := json.Unmarshal(content, &stories); err == nil {
+        return "stories", nil
+    }
+
+    var igtv struct {
+        Media []MediaContainer `json:"ig_igtv_media"`
+    }
+    if err := json.Unmarshal(content, &igtv); err == nil {
+        return "igtv", nil
+    }
+
+    var other struct {
+        Media []MediaContainer `json:"ig_other_media"`
+    }
+    if err := json.Unmarshal(content, &other); err == nil {
+        return "other", nil
+    }
+
+    return "", fmt.Errorf("unknown JSON format")
+}
 
 func GetAbsolutePath(path string) string {
     absPath, err := filepath.Abs(path)
