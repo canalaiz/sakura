@@ -1,8 +1,52 @@
 {{ define "content" }}
 {{ range . }}
+{{- $type := .Type }}
+{{- $title := .Title }}
+{{- $shortTitle := $title }}
+{{- if gt (len $title) 32 }}
+    {{- $shortTitle := (print (slice $title 0 32) "...") }}
+{{- end }}
+
+{{- if eq $type "posts" }}
 <div class="card">
     <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
-    <h2 class="card-title">{{ .Title }}</h2>
+    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
 </div>
+{{ else if eq $type "archived" }}
+<div class="card">
+    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
+    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
+</div>
+{{ else if eq $type "reels" }}
+<div class="card">
+    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
+    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
+</div>
+{{ else if eq $type "stories" }}
+<div class="card">
+    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
+    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
+</div>
+{{ else if eq $type "igtv" }}
+<div class="card">
+    <video controls class="card-image">
+        <source src="{{ .URI }}" type="video/mp4">
+        <source src="{{ .URI }}" type="video/webm">
+        <source src="{{ .URI }}" type="video/ogg">
+        Your browser does not support the video tag.
+    </video>
+    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
+</div>
+{{ else if eq $type "other" }}
+<div class="card">
+    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
+    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
+</div>
+{{ else }}
+<div class="card">
+    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
+    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
+</div>
+{{ end }}
 {{ end }}
 {{ end }}

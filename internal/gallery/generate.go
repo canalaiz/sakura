@@ -2,7 +2,6 @@ package gallery
 
 import (
     "embed"
-    "encoding/json"
     "fmt"
     "html/template"
     "io"
@@ -12,15 +11,6 @@ import (
 
 //go:embed templates/*.html
 var embeddedTemplates embed.FS
-
-type Media struct {
-    URI   string `json:"uri"`
-    Title string `json:"title"`
-}
-
-type MediaContainer struct {
-    Media []Media `json:"media"`
-}
 
 type PageData struct {
     Media     []Media
@@ -33,7 +23,7 @@ type PageData struct {
 }
 
 func readMedia(inputDir string) ([]Media, error) {
-    var mediaItems []Media
+    var mediaList []Media
     files, err := os.ReadDir(inputDir)
     if err != nil {
         LogWarn("Failed to read directory %s: %v", inputDir, err)
@@ -49,103 +39,20 @@ func readMedia(inputDir string) ([]Media, error) {
                 continue
             }
 
-            fileType, err := autoSenseJSON(content)
+            mediaItems, _, err := autoSenseContents(content)
             if err != nil {
                 LogWarn("Failed to determine JSON type for file %s: %v", filePath, err)
                 continue
             }
 
-            switch fileType {
-            case "posts":
-                var mediaContainers []MediaContainer
-                if err := json.Unmarshal(content, &mediaContainers); err != nil {
-                    LogWarn("Failed to unmarshal JSON from file %s: %v", filePath, err)
-                    continue
-                }
-                for _, mediaContainer := range mediaContainers {
-                    for _, media := range mediaContainer.Media {
-                        mediaItems = append(mediaItems, media)
-                    }
-                }
-
-            case "archived":
-                var archived struct {
-                    Media []MediaContainer `json:"ig_archived_post_media"`
-                }
-                if err := json.Unmarshal(content, &archived); err != nil {
-                    LogWarn("Failed to unmarshal JSON from file %s: %v", filePath, err)
-                    continue
-                }
-                for _, mediaContainer := range archived.Media {
-                    for _, media := range mediaContainer.Media {
-                        mediaItems = append(mediaItems, media)
-                    }
-                }
-
-            case "reels":
-                var reels struct {
-                    Media []MediaContainer `json:"ig_reels_media"`
-                }
-                if err := json.Unmarshal(content, &reels); err != nil {
-                    LogWarn("Failed to unmarshal JSON from file %s: %v", filePath, err)
-                    continue
-                }
-                for _, mediaContainer := range reels.Media {
-                    for _, media := range mediaContainer.Media {
-                        mediaItems = append(mediaItems, media)
-                    }
-                }
-
-            case "stories":
-                var stories struct {
-                    Media []Media `json:"ig_stories"`
-                }
-                if err := json.Unmarshal(content, &stories); err != nil {
-                    LogWarn("Failed to unmarshal JSON from file %s: %v", filePath, err)
-                    continue
-                }
-                for _, media := range stories.Media {
-                    mediaItems = append(mediaItems, media)
-                }
-
-            case "igtv":
-                var igtv struct {
-                    Media []MediaContainer `json:"ig_igtv_media"`
-                }
-                if err := json.Unmarshal(content, &igtv); err != nil {
-                    LogWarn("Failed to unmarshal JSON from file %s: %v", filePath, err)
-                    continue
-                }
-                for _, mediaContainer := range igtv.Media {
-                    for _, media := range mediaContainer.Media {
-                        mediaItems = append(mediaItems, media)
-                    }
-                }
-
-            case "other":
-                var other struct {
-                    Media []MediaContainer `json:"ig_other_media"`
-                }
-                if err := json.Unmarshal(content, &other); err != nil {
-                    LogWarn("Failed to unmarshal JSON from file %s: %v", filePath, err)
-                    continue
-                }
-                for _, mediaContainer := range other.Media {
-                    for _, media := range mediaContainer.Media {
-                        mediaItems = append(mediaItems, media)
-                    }
-                }
-
-            default:
-                LogWarn("Unknown JSON type for file %s", filePath)
-            }
+            mediaList = append(mediaList, mediaItems...)
         }
     }
 
-    LogInfo("Read %d media items from %s", len(mediaItems), inputDir)
-    LogVerbose("Media: %+v", mediaItems)
+    LogInfo("Read %d media from %s", len(mediaList), inputDir)
+    LogVerbose("Media: %+v", mediaList)
 
-    return mediaItems, nil
+    return mediaList, nil
 }
 
 func loadTemplates(templateDir string) (*template.Template, error) {
@@ -210,6 +117,7 @@ func Generate(inputDir, outputDir, templateDir string, mediaPerPage int, prevLab
                 LogWarn("Failed to copy media %s to %s: %v", srcPath, dstPath, err)
             }
             mediaItems[start+i].URI = filepath.ToSlash(filepath.Join(fmt.Sprintf("media_page_%d", pageNum), filepath.Base(media.URI)))
+            LogVerbose("Media: URI=%s, Type=%s, CreatedAt=%d", media.URI, media.Type, media.CreatedAt)
         }
 
         pageData := PageData{

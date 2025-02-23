@@ -8,6 +8,17 @@ import (
     "path/filepath"
 )
 
+type Media struct {
+    URI   string `json:"uri"`
+    Title string `json:"title"`
+    Type string `json:"type"`
+    CreatedAt int64 `json:"creation_timestamp"`
+}
+
+type MediaContainer struct {
+    Media []Media `json:"media"`
+}
+
 func autoSenseJSON(content []byte) (string, error) {
     var posts []MediaContainer
     if err := json.Unmarshal(content, &posts); err == nil {
@@ -50,6 +61,88 @@ func autoSenseJSON(content []byte) (string, error) {
     }
 
     return "", fmt.Errorf("unknown JSON format")
+}
+
+func autoSenseContents(content []byte) ([]Media, string, error) {
+    var mediaList []Media
+
+    var posts []MediaContainer
+    if err := json.Unmarshal(content, &posts); err == nil {
+        for _, mediaContainer := range posts {
+            for _, media := range mediaContainer.Media {
+                media.Type = "posts"
+                mediaList = append(mediaList, media)
+            }
+        }
+        return mediaList, "posts", nil
+    }
+
+    var archived struct {
+        Media []MediaContainer `json:"ig_archived_post_media"`
+    }
+    if err := json.Unmarshal(content, &archived); err == nil {
+        for _, mediaContainer := range archived.Media {
+            for _, media := range mediaContainer.Media {
+                media.Type = "archived"
+                mediaList = append(mediaList, media)
+            }
+        }
+        return mediaList, "archived", nil
+    }
+
+    var reels struct {
+        Media []MediaContainer `json:"ig_reels_media"`
+    }
+    if err := json.Unmarshal(content, &reels); err == nil {
+        for _, mediaContainer := range reels.Media {
+            for _, media := range mediaContainer.Media {
+                media.Type = "reels"
+                mediaList = append(mediaList, media)
+            }
+        }
+        return mediaList, "reels", nil
+    }
+
+    var stories struct {
+        Media []struct {
+            Media
+        } `json:"ig_stories"`
+    }
+    if err := json.Unmarshal(content, &stories); err == nil {
+        for _, media := range stories.Media {
+            media.Media.Type = "stories"
+            mediaList = append(mediaList, media.Media)
+        }
+        return mediaList, "stories", nil
+    }
+
+    var igtv struct {
+        Media []MediaContainer `json:"ig_igtv_media"`
+    }
+    if err := json.Unmarshal(content, &igtv); err == nil {
+        for _, mediaContainer := range igtv.Media {
+            for _, media := range mediaContainer.Media {
+                media.Type = "igtv"
+                mediaList = append(mediaList, media)
+            }
+        }
+        return mediaList, "igtv", nil
+    }
+
+    var other struct {
+        Media []MediaContainer `json:"ig_other_media"`
+    }
+    if err := json.Unmarshal(content, &other); err == nil {
+        for _, mediaContainer := range other.Media {
+            for _, media := range mediaContainer.Media {
+                media.Type = "other"
+                mediaList = append(mediaList, media)
+            }
+        }
+        return mediaList, "other", nil
+    }
+
+    return nil, "", fmt.Errorf("unknown JSON format")
 }
 
 func GetAbsolutePath(path string) string {
