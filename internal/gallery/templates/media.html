@@ -1,52 +1,127 @@
-{{ define "content" }}
-{{ range . }}
+{{ define "card" }}
+<style>
+    /* Gallery Base Style */
+    .card-main-image {
+        position: relative;
+        width: 100%;
+        text-align: center;
+        margin-bottom: 10px;
+    }
+
+    .thumbnail-container {
+        display: flex;
+        justify-content: center;
+        gap: 5px;
+        flex-wrap: wrap;
+    }
+
+    .thumbnail {
+        width: 50px;
+        height: 50px;
+        object-fit: cover;
+        cursor: pointer;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    .thumbnail:hover {
+        border-color: #999;
+    }
+</style>
+
+{{ range $i, $container := . }}
 {{- $type := .Type }}
 {{- $title := .Title }}
-{{- $shortTitle := $title }}
-{{- if gt (len $title) 32 }}
-    {{- $shortTitle := (print (slice $title 0 32) "...") }}
-{{- end }}
+{{- $medias := .Media }}
 
-{{- if eq $type "posts" }}
 <div class="card">
-    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
-    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
-</div>
-{{ else if eq $type "archived" }}
-<div class="card">
-    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
-    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
-</div>
-{{ else if eq $type "reels" }}
-<div class="card">
-    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
-    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
-</div>
-{{ else if eq $type "stories" }}
-<div class="card">
-    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
-    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
-</div>
-{{ else if eq $type "igtv" }}
-<div class="card">
-    <video controls class="card-image">
-        <source src="{{ .URI }}" type="video/mp4">
-        <source src="{{ .URI }}" type="video/webm">
-        <source src="{{ .URI }}" type="video/ogg">
-        Your browser does not support the video tag.
-    </video>
-    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
-</div>
-{{ else if eq $type "other" }}
-<div class="card">
-    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
-    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
-</div>
-{{ else }}
-<div class="card">
-    <img src="{{ .URI }}" class="card-image" onclick="window.open('{{ .URI }}', '_blank')" />
-    <h2 class="card-title" title="{{ $title }}">{{ $shortTitle }}</h2>
+    <!-- Image / Video Foreground -->
+    <div class="card-main-image">
+        {{- if gt (len $medias) 0 }}
+            {{- $firstMedia := index $medias 0 }}
+            {{ if eq $type "igtv" }}
+                <video 
+                    id="main-media-{{ $i }}" 
+                    class="card-image" 
+                    controls 
+                    onclick="window.open(this.querySelector('source').src, '_blank')"
+                    title="{{ $firstMedia.Title }}" 
+                >
+                    <source src="{{ $firstMedia.URI }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            {{ else }}
+                <img 
+                    id="main-media-{{ $i }}" 
+                    src="{{ $firstMedia.URI }}" 
+                    class="card-image" 
+                    onclick="window.open(this.src, '_blank')" 
+                    title="{{ $firstMedia.Title }}" 
+                />
+            {{ end }}
+        {{- end }}
+    </div>
+
+    <!-- Thumbnails -->
+    <div class="thumbnail-container">
+        {{ range $j, $m := $medias }}
+            {{ if eq $type "igtv" }}
+                <!-- Video Thumbnail -->
+                <img 
+                    src="data:image/png;base64,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"
+                    class="thumbnail"
+                    onclick="updateMainMedia({{ $i }}, '{{ $m.URI }}', '{{ base64Encode $m.Title }}', true)" 
+                    title="{{ $m.Title }}"
+                />
+            {{ else }}
+                <!-- Image Thumbnail -->
+                <img 
+                    src="{{ $m.URI }}" 
+                    class="thumbnail" 
+                    onclick="updateMainMedia({{ $i }}, '{{ $m.URI }}', '{{ base64Encode $m.Title }}', false )" 
+                    title="{{ $m.Title }}" 
+                />
+
+            {{ end }}
+        {{ end }}
+    </div>
+
+    <!-- Container Title -->
+    <h3 class="card-title" title="{{ $title }}">
+        {{ if gt (len $title) 80 }}
+            {{ slice $title 0 80 }}...
+        {{ else }}
+            {{ $title }}
+        {{ end }}
+    </h2>
 </div>
 {{ end }}
-{{ end }}
+
+<script>
+    function updateMainMedia(cardIndex, newSrc, newTitle, isVideo) {
+        const mainMedia = document.getElementById(`main-media-${cardIndex}`);
+        if (!mainMedia) return;
+
+        if (isVideo) {
+            const videoParent = mainMedia.parentElement;
+            const newVideo = document.createElement('video');
+            newVideo.id = `main-media-${cardIndex}`;
+            newVideo.className = 'card-image';
+            newVideo.controls = true;
+            newVideo.onclick = () => window.open(newSrc, '_blank');
+            
+            newVideo.title = atob(newTitle);
+
+            const sourceMp4 = document.createElement('source');
+            sourceMp4.src = newSrc;
+            sourceMp4.type = 'video/mp4';
+            newVideo.appendChild(sourceMp4);
+
+            videoParent.removeChild(mainMedia);
+            videoParent.appendChild(newVideo);
+        } else {
+            mainMedia.src = newSrc;
+            mainMedia.title = atob(newTitle);
+        }
+    }
+</script>
 {{ end }}

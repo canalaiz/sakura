@@ -9,137 +9,75 @@ import (
 )
 
 type Media struct {
-    URI   string `json:"uri"`
-    Title string `json:"title"`
-    Type string `json:"type"`
-    CreatedAt int64 `json:"creation_timestamp"`
+    URI             string `json:"uri"`
+    CreatedAt       int64  `json:"creation_timestamp"`
+    Title           string `json:"title"`
 }
 
 type MediaContainer struct {
-    Media []Media `json:"media"`
+    Title     string `json:"title"`
+    CreatedAt int64  `json:"creation_timestamp"`
+    Media     []Media `json:"media"`
+    Type      string  `json:"-"`
 }
 
-func autoSenseJSON(content []byte) (string, error) {
+func autoSenseContents(content []byte) ([]MediaContainer, string, error) {
     var posts []MediaContainer
     if err := json.Unmarshal(content, &posts); err == nil {
-        return "posts", nil
+        for i := range posts {
+            posts[i].Type = "posts"
+        }
+        return posts, "posts", nil
     }
 
     var archived struct {
         Media []MediaContainer `json:"ig_archived_post_media"`
     }
     if err := json.Unmarshal(content, &archived); err == nil {
-        return "archived", nil
+        for i := range archived.Media {
+            archived.Media[i].Type = "archived"
+        }
+        return archived.Media, "archived", nil
     }
 
     var reels struct {
         Media []MediaContainer `json:"ig_reels_media"`
     }
     if err := json.Unmarshal(content, &reels); err == nil {
-        return "reels", nil
+        for i := range reels.Media {
+            reels.Media[i].Type = "reels"
+        }
+        return reels.Media, "reels", nil
     }
 
     var stories struct {
-        Media []Media `json:"ig_stories"`
+        Media []MediaContainer `json:"ig_stories"`
     }
     if err := json.Unmarshal(content, &stories); err == nil {
-        return "stories", nil
+        for i := range stories.Media {
+            stories.Media[i].Type = "stories"
+        }
+        return stories.Media, "stories", nil
     }
 
     var igtv struct {
         Media []MediaContainer `json:"ig_igtv_media"`
     }
     if err := json.Unmarshal(content, &igtv); err == nil {
-        return "igtv", nil
+        for i := range igtv.Media {
+            igtv.Media[i].Type = "igtv"
+        }
+        return igtv.Media, "igtv", nil
     }
 
     var other struct {
         Media []MediaContainer `json:"ig_other_media"`
     }
     if err := json.Unmarshal(content, &other); err == nil {
-        return "other", nil
-    }
-
-    return "", fmt.Errorf("unknown JSON format")
-}
-
-func autoSenseContents(content []byte) ([]Media, string, error) {
-    var mediaList []Media
-
-    var posts []MediaContainer
-    if err := json.Unmarshal(content, &posts); err == nil {
-        for _, mediaContainer := range posts {
-            for _, media := range mediaContainer.Media {
-                media.Type = "posts"
-                mediaList = append(mediaList, media)
-            }
+        for i := range other.Media {
+            other.Media[i].Type = "other"
         }
-        return mediaList, "posts", nil
-    }
-
-    var archived struct {
-        Media []MediaContainer `json:"ig_archived_post_media"`
-    }
-    if err := json.Unmarshal(content, &archived); err == nil {
-        for _, mediaContainer := range archived.Media {
-            for _, media := range mediaContainer.Media {
-                media.Type = "archived"
-                mediaList = append(mediaList, media)
-            }
-        }
-        return mediaList, "archived", nil
-    }
-
-    var reels struct {
-        Media []MediaContainer `json:"ig_reels_media"`
-    }
-    if err := json.Unmarshal(content, &reels); err == nil {
-        for _, mediaContainer := range reels.Media {
-            for _, media := range mediaContainer.Media {
-                media.Type = "reels"
-                mediaList = append(mediaList, media)
-            }
-        }
-        return mediaList, "reels", nil
-    }
-
-    var stories struct {
-        Media []struct {
-            Media
-        } `json:"ig_stories"`
-    }
-    if err := json.Unmarshal(content, &stories); err == nil {
-        for _, media := range stories.Media {
-            media.Media.Type = "stories"
-            mediaList = append(mediaList, media.Media)
-        }
-        return mediaList, "stories", nil
-    }
-
-    var igtv struct {
-        Media []MediaContainer `json:"ig_igtv_media"`
-    }
-    if err := json.Unmarshal(content, &igtv); err == nil {
-        for _, mediaContainer := range igtv.Media {
-            for _, media := range mediaContainer.Media {
-                media.Type = "igtv"
-                mediaList = append(mediaList, media)
-            }
-        }
-        return mediaList, "igtv", nil
-    }
-
-    var other struct {
-        Media []MediaContainer `json:"ig_other_media"`
-    }
-    if err := json.Unmarshal(content, &other); err == nil {
-        for _, mediaContainer := range other.Media {
-            for _, media := range mediaContainer.Media {
-                media.Type = "other"
-                mediaList = append(mediaList, media)
-            }
-        }
-        return mediaList, "other", nil
+        return other.Media, "other", nil
     }
 
     return nil, "", fmt.Errorf("unknown JSON format")
