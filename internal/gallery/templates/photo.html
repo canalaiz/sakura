@@ -1,8 +1,0 @@
-{{ define "content" }}
-{{ range . }}
-<div class="card">
-    <img src="{{ .Path }}" class="card-image" onclick="window.open('{{ .Path }}', '_blank')" />
-    <h2 class="card-title">{{ .Title }}</h2>
-</div>
-{{ end }}
-{{ end }}

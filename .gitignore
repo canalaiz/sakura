@@ -11,3 +11,6 @@
 # Ignore temporary files
 *.tmp
 *.log
+
+# Ignore local development files
+/local-dev/

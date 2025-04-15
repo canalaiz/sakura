@@ -2,28 +2,23 @@ package gallery
 
 import (
     "embed"
-    "encoding/json"
     "fmt"
+    "encoding/base64"
     "html/template"
     "io"
     "os"
     "path/filepath"
+    "bytes"
+    "io/ioutil"
+    "golang.org/x/text/encoding/charmap"
+    "golang.org/x/text/transform"    
 )
 
 //go:embed templates/*.html
 var embeddedTemplates embed.FS
 
-type Media struct {
-    URI   string `json:"uri"`
-    Title string `json:"title"`
-}
-
-type MediaContainer struct {
-    Media []Media `json:"media"`
-}
-
 type PageData struct {
-    Photos    []Photo
+    MediaContainers     []MediaContainer
     Prev      string
     Next      string
     Title     string
@@ -32,13 +27,35 @@ type PageData struct {
     PageNum   int
 }
 
-type Photo struct {
-    Path  string `json:"path"`
-    Title string `json:"title"`
+func base64Encode(s string) string {
+    return base64.StdEncoding.EncodeToString([]byte(s))
 }
 
-func readPhotos(inputDir string) ([]Photo, error) {
-    var photos []Photo
+// fixes mojibake by converting characters outside the ASCII range to their byte representation
+func fixMojibake(s string) string {
+    b := make([]byte, 0, len(s))
+    for _, r := range s {
+        if r > 255 {
+            b = append(b, []byte(string(r))...)
+        } else {
+            b = append(b, byte(r))
+        }
+    }
+    return string(b)
+}
+
+
+func repairEncoding(s string) string {
+    reader := transform.NewReader(bytes.NewReader([]byte(s)), charmap.Windows1252.NewDecoder())
+    fixed, err := ioutil.ReadAll(reader)
+    if err != nil {
+        return s
+    }
+    return string(fixed)
+}
+
+func readMedia(inputDir string) ([]MediaContainer, error) {
+    var mediaContainers []MediaContainer
     files, err := os.ReadDir(inputDir)
     if err != nil {
         LogWarn("Failed to read directory %s: %v", inputDir, err)
@@ -51,43 +68,57 @@ func readPhotos(inputDir string) ([]Photo, error) {
             content, err := os.ReadFile(filePath)
             if err != nil {
                 LogWarn("Failed to read file %s: %v", filePath, err)
-                return nil, err
+                continue
             }
 
-            var mediaContainers []MediaContainer
-            if err := json.Unmarshal(content, &mediaContainers); err != nil {
-                LogWarn("Failed to unmarshal JSON from file %s: %v", filePath, err)
-                return nil, err
+            mediaItems, _, err := autoSenseContents(content)
+            if err != nil {
+                LogWarn("Failed to determine JSON type for file %s: %v", filePath, err)
+                continue
             }
 
-            for _, mediaContainer := range mediaContainers {
-                for _, media := range mediaContainer.Media {
-                    photo := Photo{
-                        Path:  media.URI,
-                        Title: media.Title,
-                    }
-                    photos = append(photos, photo)
+            // Fix titles
+            for i, container := range mediaItems {
+                container.Title = fixMojibake(container.Title)
+                for j, media := range container.Media {
+                    media.Title = fixMojibake(media.Title)
+                    container.Media[j] = media
                 }
+                mediaItems[i] = container
             }
+
+            mediaContainers = append(mediaContainers, mediaItems...)
         }
     }
 
-    LogInfo("Read %d photos from %s", len(photos), inputDir)
-    LogVerbose("Photos: %+v", photos)
+    LogInfo("Read %d media containers from %s", len(mediaContainers), inputDir)
+    LogVerbose("Media Containers: %+v", mediaContainers)
 
-    return photos, nil
+    return mediaContainers, nil
 }
 
 func loadTemplates(templateDir string) (*template.Template, error) {
+    // Inject these functions on templates
+    funcMap := template.FuncMap{
+        "base64Encode": base64Encode,
+    }
+
+    var tmpl *template.Template
+
     if templateDir == "" {
         LogInfo("Loading embedded templates")
-        return template.ParseFS(embeddedTemplates, "templates/*.html")
+        // Crea un nuovo template e registra il funcMap PRIMA di fare il parsing.
+        tmpl = template.New("").Funcs(funcMap)
+        return tmpl.ParseFS(embeddedTemplates, "templates/*.html")
     }
+
     LogInfo("Loading templates from %s", templateDir)
-    return template.ParseGlob(filepath.Join(templateDir, "*.html"))
+    tmpl = template.New("").Funcs(funcMap)
+    return tmpl.ParseGlob(filepath.Join(templateDir, "*.html"))
 }
 
-func copyPhoto(src, dst string) error {
+
+func copyMedia(src, dst string) error {
     srcFile, err := os.Open(src)
     if err != nil {
         return err
@@ -104,46 +135,48 @@ func copyPhoto(src, dst string) error {
     return err
 }
 
-func Generate(inputDir, outputDir, templateDir string, photosPerPage int, prevLabel, nextLabel string) {
-    LogInfo("Generating gallery with inputDir=%s, outputDir=%s, templateDir=%s, photosPerPage=%d, prevLabel=%s, nextLabel=%s",
-        inputDir, outputDir, templateDir, photosPerPage, prevLabel, nextLabel)
+func Generate(inputDir, outputDir, templateDir string, mediaPerPage int, prevLabel, nextLabel string) {
+    LogInfo("Generating gallery with inputDir=%s, outputDir=%s, templateDir=%s, mediaPerPage=%d, prevLabel=%s, nextLabel=%s",
+        inputDir, outputDir, templateDir, mediaPerPage, prevLabel, nextLabel)
 
     templates, err := loadTemplates(templateDir)
     if err != nil {
         LogFatal("Failed to parse templates: %v", err)
     }
 
-    photos, err := readPhotos(inputDir)
+    mediaContainers, err := readMedia(inputDir)
     if err != nil {
-        LogFatal("Failed to read photos: %v", err)
+        LogFatal("Failed to read media: %v", err)
     }
 
-    numPages := (len(photos) + photosPerPage - 1) / photosPerPage
+    numPages := (len(mediaContainers) + mediaPerPage - 1) / mediaPerPage
 
     for pageNum := 1; pageNum <= numPages; pageNum++ {
-        start := (pageNum - 1) * photosPerPage
-        end := pageNum * photosPerPage
-        if end > len(photos) {
-            end = len(photos)
+        start := (pageNum - 1) * mediaPerPage
+        end := pageNum * mediaPerPage
+        if end > len(mediaContainers) {
+            end = len(mediaContainers)
         }
 
-        pagePhotoOutputDir := filepath.Join(outputDir, fmt.Sprintf("photos_page_%d", pageNum))
-        if err := os.MkdirAll(pagePhotoOutputDir, 0755); err != nil {
-            LogFatal("Failed to create photos directory for page %d: %v", pageNum, err)
+        pageMediaOutputDir := filepath.Join(outputDir, fmt.Sprintf("media_page_%d", pageNum))
+        if err := os.MkdirAll(pageMediaOutputDir, 0755); err != nil {
+            LogFatal("Failed to create media directory for page %d: %v", pageNum, err)
         }
 
-        for i, photo := range photos[start:end] {
-            LogVerbose("Copying photo from %s with inputDir=%s", photo.Path, inputDir)
-            srcPath := filepath.Join(inputDir, "../../", photo.Path)
-            dstPath := filepath.Join(pagePhotoOutputDir, filepath.Base(photo.Path))
-            if err := copyPhoto(srcPath, dstPath); err != nil {
-                LogWarn("Failed to copy photo %s to %s: %v", srcPath, dstPath, err)
+        for _, mediaContainer := range mediaContainers[start:end] {
+            for i, media := range mediaContainer.Media {
+                LogVerbose("Copying media from %s with inputDir=%s", media.URI, inputDir)
+                srcPath := filepath.Join(inputDir, "../../", media.URI)
+                dstPath := filepath.Join(pageMediaOutputDir, filepath.Base(media.URI))
+                if err := copyMedia(srcPath, dstPath); err != nil {
+                    LogWarn("Failed to copy media %s to %s: %v", srcPath, dstPath, err)
+                }
+                mediaContainer.Media[i].URI = filepath.ToSlash(filepath.Join(fmt.Sprintf("media_page_%d", pageNum), filepath.Base(media.URI)))
             }
-            photos[start+i].Path = filepath.ToSlash(filepath.Join(fmt.Sprintf("photos_page_%d", pageNum), filepath.Base(photo.Path)))
         }
 
         pageData := PageData{
-            Photos:    photos[start:end],
+            MediaContainers:     mediaContainers[start:end],
             Prev:      "",
             Next:      "",
             Title:     fmt.Sprintf("Sakura Gallery Page %d", pageNum),
