@@ -12,6 +12,7 @@ import (
     "io/ioutil"
     "golang.org/x/text/encoding/charmap"
     "golang.org/x/text/transform"    
+    "strings"
 )
 
 //go:embed templates/*.html
@@ -29,6 +30,22 @@ type PageData struct {
 
 func base64Encode(s string) string {
     return base64.StdEncoding.EncodeToString([]byte(s))
+}
+
+func isVideoUri(uri string) bool {
+	if i := strings.LastIndex(uri, "/"); i >= 0 {
+		uri = uri[i+1:]
+	}
+	if dot := strings.LastIndex(uri, "."); dot >= 0 {
+		ext := strings.ToLower(uri[dot:])
+		switch ext {
+		case ".mp4", ".webm", ".ogg", ".ogv":
+			return true
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // fixes mojibake by converting characters outside the ASCII range to their byte representation
@@ -101,13 +118,13 @@ func loadTemplates(templateDir string) (*template.Template, error) {
     // Inject these functions on templates
     funcMap := template.FuncMap{
         "base64Encode": base64Encode,
+        "isVideoUri": isVideoUri,
     }
 
     var tmpl *template.Template
 
     if templateDir == "" {
         LogInfo("Loading embedded templates")
-        // Crea un nuovo template e registra il funcMap PRIMA di fare il parsing.
         tmpl = template.New("").Funcs(funcMap)
         return tmpl.ParseFS(embeddedTemplates, "templates/*.html")
     }
