@@ -193,22 +193,33 @@ func Generate(inputDir, outputDir, templateDir string, mediaPerPage int, prevLab
         }
 
         pageData := PageData{
-            MediaContainers:     mediaContainers[start:end],
-            Prev:      "",
-            Next:      "",
-            Title:     fmt.Sprintf("Sakura Gallery Page %d", pageNum),
-            PrevLabel: prevLabel,
-            NextLabel: nextLabel,
-            PageNum:   pageNum,
+            MediaContainers: mediaContainers[start:end],
+            Prev:            "",
+            Next:            "",
+            Title:           fmt.Sprintf("Sakura Gallery Page %d", pageNum),
+            PrevLabel:       prevLabel,
+            NextLabel:       nextLabel,
+            PageNum:         pageNum,
         }
         if pageNum > 1 {
-            pageData.Prev = fmt.Sprintf("gallery_page_%d.html", pageNum-1)
+            if pageNum - 1 == 1 {
+                pageData.Prev = "index.html"
+            } else {
+                pageData.Prev = fmt.Sprintf("index_%d.html", pageNum-1)
+            }
         }
         if pageNum < numPages {
-            pageData.Next = fmt.Sprintf("gallery_page_%d.html", pageNum+1)
+            pageData.Next = fmt.Sprintf("index_%d.html", pageNum+1)
         }
 
-        outputFile, err := os.Create(filepath.Join(outputDir, fmt.Sprintf("gallery_page_%d.html", pageNum)))
+        var outputFilename string
+        if pageNum == 1 {
+            outputFilename = "index.html"
+        } else {
+            outputFilename = fmt.Sprintf("index_%d.html", pageNum)
+        }
+
+        outputFile, err := os.Create(filepath.Join(outputDir, outputFilename))
         if err != nil {
             LogFatal("Failed to create output file: %v", err)
         }
@@ -218,6 +229,6 @@ func Generate(inputDir, outputDir, templateDir string, mediaPerPage int, prevLab
             LogFatal("Failed to execute base template: %v", err)
         }
 
-        LogVerbose("Gallery page generated at %s/gallery_page_%d.html", outputDir, pageNum)
+        LogVerbose("Gallery page generated at %s/%s", outputDir, outputFilename)
     }
 }
